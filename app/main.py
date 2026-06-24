@@ -1,14 +1,30 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from .api.health import router as health_router
 from .api.v1.tasks import router as tasks_router
+from .core.database import engine
+from .models.task import Base 
 
 app = FastAPI(
     title="TaskVortex API",
     description="Production-grade asynchronous task orchestration engine.",
     version="1.0.0",
 )
+
+# @app.on_event("startup")
+# async def init_db() -> None:
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+
+@asynccontextmanager 
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield 
+    await engine.dispose()
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
