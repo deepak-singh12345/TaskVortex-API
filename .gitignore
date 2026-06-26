@@ -61,7 +61,11 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Alembic
+alembic/__pycache__/
+
 # =========================
 # Project Notes
 # =========================
 progress.md
+failure.md

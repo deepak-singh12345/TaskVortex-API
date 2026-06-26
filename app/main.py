@@ -13,19 +13,19 @@ from .models import *
 
 
 
-@asynccontextmanager 
-async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield 
-    await engine.dispose()
+# @asynccontextmanager 
+# async def lifespan(app: FastAPI):
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+#     yield 
+#     await engine.dispose()
 
 
 app = FastAPI(
     title="TaskVortex API",
     description="Production-grade asynchronous task orchestration engine.",
     version="1.0.0",
-    lifespan=lifespan
+    # lifespan=lifespan
 )
 
 @app.exception_handler(RequestValidationError)
