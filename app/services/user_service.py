@@ -1,7 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
 
 from app.repository.task_repository import TaskRepository
 from app.repository.user_repository import UserRepository
+from app.core.security import hash_password
+from app.core.exception import UserAlreadyExistsError
 import asyncio 
 
 
@@ -13,6 +16,17 @@ class UserService:
     async def get_user_with_tasks(self, user_id: int):
         user = await self.user_repo.get_user_by_id(user_id)
 
+        return user 
+    
+    async def create_user(self, user_email: str, user_name: str, user_password: str):
+        existing_user = await self.user_repo.get_user_by_email(user_email)
+        
+        if existing_user:
+            raise UserAlreadyExistsError()
+        
+        hashed_password = hash_password(password=user_password)
+        user = await self.user_repo.create_user(name=user_name, email=user_email, hashed_password=hashed_password)
+        
         return user 
         
 #         """
