@@ -3,8 +3,8 @@ from fastapi import HTTPException
 
 from app.repository.task_repository import TaskRepository
 from app.repository.user_repository import UserRepository
-from app.core.security import hash_password
-from app.core.exception import UserAlreadyExistsError
+from app.core.security import create_access_token, hash_password, verify_password
+from app.core.exception import InvalidCredentialsError, UserAlreadyExistsError
 import asyncio 
 
 
@@ -29,6 +29,22 @@ class UserService:
         
         return user 
         
+    async def login(self, user_email: str, user_password: str):
+        user = await self.user_repo.get_user_by_email(user_email)
+        
+        if not user:
+            raise InvalidCredentialsError()
+        
+        password_matches = verify_password(user_password, user.hashed_password)
+        
+        if not password_matches:
+            raise InvalidCredentialsError()
+        
+        access_token = create_access_token(
+            data={"sub": str(user.id)}
+        )
+        
+        return access_token
 #         """
         
 #         why sequential instead of doing concurrent 
