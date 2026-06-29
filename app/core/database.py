@@ -5,10 +5,11 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     AsyncSession
 )
+from app.core.config import settings
 
 load_dotenv()
 
-DATABASE_URL: str = os.getenv("DATABASE_URL")
+DATABASE_URL: str = settings.DATABASE_URL
 
 
 engine = create_async_engine(DATABASE_URL, echo=True)
