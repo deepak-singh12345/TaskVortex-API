@@ -7,27 +7,37 @@ class TaskRepository:
     def __init__(self, db: AsyncSession):
         self.db: AsyncSession = db
         
-    async def create_task(
-        self,
-        title: str,
-        description: str | None,
-        task_type: str,
-        priority: int,
-        user_id: int
-    ) -> Task:
-        task = Task(
-            title=title,
-            description=description,
-            task_type=task_type,
-            priority=priority,
-            user_id=user_id
-        )
+    # async def create_task(
+    #     self,
+    #     title: str,
+    #     description: str | None,
+    #     # task_type: str,
+    #     priority: int,
+    #     user_id: int,
+    #     payload: dict,
+    #     status: str,
+    #     tracking_token: str
+    # ) -> Task:
+    #     task = Task(
+    #         title=title,
+    #         description=description,
+    #         # task_type=task_type,
+    #         priority=priority,
+    #         user_id=user_id
+    #     )
 
+    #     self.db.add(task)
+    #     await self.db.commit()
+    #     await self.db.refresh(task)
+
+    #     return task
+    
+    async def save(self, task: Task) -> Task:
         self.db.add(task)
         await self.db.commit()
         await self.db.refresh(task)
-
-        return task
+        
+        return task 
         
     async def get_task_by_id(self, task_id: int) -> Task | None:
         stmt = select(Task).where(Task.id == task_id) 

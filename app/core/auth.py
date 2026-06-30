@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user import User
 from app.repository.user_repository import UserRepository
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.config import settings
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/users/login")
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -23,8 +24,8 @@ async def get_current_user(
     try:
         payload = jwt.decode(
             token, 
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
         )
         
         user_id = payload.get("sub")
@@ -38,5 +39,8 @@ async def get_current_user(
     user_repo = UserRepository(db)
     
     user = await user_repo.get_user_by_id(int(user_id))
+    
+    if user is None:
+        raise credentials_exception
     
     return user 
