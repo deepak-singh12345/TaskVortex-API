@@ -1,3 +1,4 @@
+from datetime import datetime
 import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,6 +58,30 @@ class TaskService:
                 "tracking_token": str(token)
             }
             
+    async def get_task_history(
+        self, 
+        user_id: int,
+        status: TaskStatus | None,
+        search_query: str | None,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        page: int = 1,
+        limit: int = 10,) -> dict:
+        if search_query:
+            search_query = search_query.strip() 
+        tasks, total_count = await self.task_repo.get_paginated_tasks_for_user(
+            user_id=user_id, status=status, search_query=search_query, start_date=start_date, end_date=end_date, page=page, limit=limit)
+        return {
+            "tasks": tasks,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total_count": total_count,
+                "total_pages": (total_count + limit - 1) // limit
+            }
+        }
+        
+            
 async def simulate_heavy_processing(task_id: int):
     await asyncio.sleep(10)
     async with AsyncSessionLocal() as db:
@@ -66,4 +91,5 @@ async def simulate_heavy_processing(task_id: int):
             return 
         task.status = TaskStatus.COMPLETED
         await db.commit()
+        
         

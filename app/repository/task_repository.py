@@ -1,7 +1,9 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime
 
-from app.models.task import Task
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+
+from app.models.task import Task, TaskStatus
 
 class TaskRepository:
     def __init__(self, db: AsyncSession):
@@ -50,3 +52,40 @@ class TaskRepository:
         result = await self.db.execute(stmt)
         tasks = result.scalars().all()
         return tasks 
+    
+    async def get_paginated_tasks_for_user(
+        self, 
+        user_id: int, 
+        status: TaskStatus | None =None, 
+        search_query: str| None=None, 
+        start_date: datetime | None=None, 
+        end_date: datetime | None=None, 
+        page: int=1, 
+        limit: int=10) -> tuple[list[Task], int]:
+        
+        stmt = select(Task).where(Task.user_id == user_id)
+        
+        if status is not None:
+            stmt = stmt.where(Task.status == status)
+        
+        if search_query is not None:
+            stmt = stmt.where(Task.title.ilike(f"%{search_query}%"))
+        
+        if start_date is not None:
+            stmt = stmt.where(Task.created_at >= start_date)
+            
+        if end_date is not None:
+            stmt = stmt.where(Task.created_at <= end_date)
+            
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await self.db.execute(count_stmt)
+        total_count = count_result.scalar_one()
+        
+        offset = (page - 1) * limit
+        stmt = stmt.order_by(Task.created_at.desc())
+        paginated_stmt = stmt.limit(limit).offset(offset)
+        
+        tasks_result = await self.db.execute(paginated_stmt)
+        tasks = tasks_result.scalars().all()
+        
+        return tasks, total_count

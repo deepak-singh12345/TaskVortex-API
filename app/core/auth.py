@@ -28,7 +28,7 @@ async def get_current_user(
             algorithms=[settings.ALGORITHM]
         )
         
-        user_id = payload.get("sub")
+        user_id: str = payload.get("sub")
         
         if user_id is None:
             raise credentials_exception
@@ -44,3 +44,6 @@ async def get_current_user(
         raise credentials_exception
     
     return user 
+
+
+#chage the function to get user by id and remove all it's call while creating test data. 

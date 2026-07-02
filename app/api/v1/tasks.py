@@ -1,11 +1,14 @@
+from datetime import datetime
+
 from app.core.auth import get_current_user
+from app.models.task import TaskStatus
 from app.models.user import User
 from app.repository.task_repository import TaskRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import BackgroundTasks, Depends, HTTPException
 from app.core.database import get_db
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Query
 from app.schemas.task import TaskCreate
 from app.services.task_service import TaskService 
 
@@ -26,6 +29,33 @@ async def create_task(
     result = await task_service.create_task(task=task, background_tasks=background_tasks, user_id=current_user.id)
     return result
 
+@router.get("/history")
+async def get_task_history(
+    status: TaskStatus | None = None,
+    search_query: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    
+    # 3. Optional Query Parameters (With fallback defaults)
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task_service = TaskService(db)
+    
+    response = await task_service.get_task_history(
+        user_id=current_user.id,
+        status=status,
+        search_query=search_query,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        limit=limit
+    )
+
+    return response
     
 @router.post("/create-test-task")
 async def create_test_task(
