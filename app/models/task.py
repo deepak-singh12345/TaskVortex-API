@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict
 from enum import Enum
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as SQLEnum, Index
 import uuid 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import ForeignKey, String, Integer, DateTime, func, Uuid
@@ -41,3 +41,7 @@ class Task(Base):
     user:Mapped["User"] = relationship(back_populates="tasks")
     
     log_metrics: Mapped[list["LogMetrics"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index("task_user_id_created_at_idx", "user_id", "created_at"),
+    )
