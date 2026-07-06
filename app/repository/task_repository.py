@@ -34,12 +34,10 @@ class TaskRepository:
 
     #     return task
     
-    async def save(self, task: Task) -> Task:
+    async def save(self, task: Task) -> None:
         self.db.add(task)
-        await self.db.commit()
-        await self.db.refresh(task)
         
-        return task 
+        return None
         
     async def get_task_by_id(self, task_id: int) -> Task | None:
         stmt = select(Task).where(Task.id == task_id) 

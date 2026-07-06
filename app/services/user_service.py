@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
+from app.models.user import User
 from app.repository.task_repository import TaskRepository
 from app.repository.user_repository import UserRepository
 from app.core.security import create_access_token, hash_password, verify_password
@@ -10,13 +11,14 @@ import asyncio
 
 class UserService:
     def __init__(self, db:AsyncSession):
+        self.db = db
         self.user_repo = UserRepository(db)
         self.task_repo = TaskRepository(db)
         
-    async def get_user_with_tasks(self, user_id: int):
-        user = await self.user_repo.get_user_by_id(user_id)
+    # async def get_user_with_tasks(self, user_id: int):
+    #     user = await self.user_repo.get_user_by_id(user_id)
 
-        return user 
+    #     return user 
     
     async def create_user(self, user_email: str, user_name: str, user_password: str):
         existing_user = await self.user_repo.get_user_by_email(user_email)
@@ -25,9 +27,12 @@ class UserService:
             raise UserAlreadyExistsError()
         
         hashed_password = hash_password(password=user_password)
-        user = await self.user_repo.create_user(name=user_name, email=user_email, hashed_password=hashed_password)
+        user_obj = User(name=user_name, email=user_email, hashed_password=hashed_password)
+        await self.user_repo.create_user(user_obj)
+        await self.db.commit()
+        await self.db.refresh(user_obj)
         
-        return user 
+        return user_obj
         
     async def login(self, user_email: str, user_password: str):
         user = await self.user_repo.get_user_by_email(user_email)

@@ -41,7 +41,7 @@ async def create_test_user(
         "email": user.email
     }
     
-@router.post("/signup")
+@router.post("/signup", status_code=201)
 async def register(
     user: UserSignup,
     db: AsyncSession = Depends(get_db)
