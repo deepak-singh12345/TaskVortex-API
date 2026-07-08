@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task, TaskStatus
 from app.repository.task_repository import TaskRepository
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException
 from uuid import uuid4
 import asyncio
 import json
@@ -13,7 +13,7 @@ from app.core.redis import redis_client
 
 from app.core.database import AsyncSessionLocal
 
-from app.schemas.task import TaskCreate
+from app.schemas.task import TaskCreate, TaskUpdate
 
 class TaskService:
     def __init__(self, db:AsyncSession):
@@ -142,6 +142,29 @@ class TaskService:
         
         await redis_client.set(cache_key, json.dumps(response), ex=300)
         return response 
+    
+    async def update_task(self, task_id: int, user_id: int, task_update: TaskUpdate):
+        task = await self.task_repo.get_task_for_update(task_id, user_id)
+        
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        update_data = task_update.model_dump(exclude_unset=True)
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields provided for update")
+        
+        for key, value in update_data.items():
+            setattr(task, key, value)
+        
+        await self.db.commit()
+        await self.db.refresh(task)  #commit writes and refresh reads back
+        
+        keys = await redis_client.keys(f"task_history:{user_id}:*")
+        if keys:
+            await redis_client.delete(*keys)
+            
+        return task
         
             
 async def simulate_heavy_processing(task_id: int):

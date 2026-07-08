@@ -51,6 +51,12 @@ class TaskRepository:
         tasks = result.scalars().all()
         return tasks 
     
+    async def get_task_for_update(self, task_id: int, user_id: int) -> Task | None:
+        stmt = select(Task).where(Task.user_id==user_id, Task.id == task_id).with_for_update()
+        result = await self.db.execute(stmt)
+        task = result.scalar_one_or_none()
+        return task
+    
     async def get_paginated_tasks_for_user(
         self, 
         user_id: int, 

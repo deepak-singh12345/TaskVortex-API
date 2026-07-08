@@ -8,3 +8,8 @@ class TaskCreate(BaseModel):
     complexity: Literal['light', 'heavy']
     priority: int = Field(default=1, ge=1, le=5, description="Priority from 1 to 5")
     payload: dict[str, Any]
+    
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=100, description="Title of the task")
+    description: str | None = Field(default=None, max_length=1000)
+    priority: int | None = Field(default=None, ge=1, le=5, description="Priority from 1 to 5")

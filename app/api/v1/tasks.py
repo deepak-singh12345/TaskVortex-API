@@ -9,7 +9,7 @@ from fastapi import BackgroundTasks, Depends, HTTPException
 from app.core.database import get_db
 
 from fastapi import APIRouter, status, Query
-from app.schemas.task import TaskCreate
+from app.schemas.task import TaskCreate, TaskUpdate
 from app.services.task_service import TaskService 
 
 router = APIRouter(prefix="/v1/tasks", tags=["Tasks"])
@@ -57,22 +57,33 @@ async def get_task_history(
 
     return response
     
-@router.post("/create-test-task")
-async def create_test_task(
-    db: AsyncSession = Depends(get_db) 
+@router.patch("/{task_id}")
+async def update_task(
+    task: TaskUpdate,
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    task_repo = TaskRepository(db)
+    task_service = TaskService(db)
+    result = await task_service.update_task(user_id=current_user.id, task_id=task_id, task_update=task)
+    return result 
+    
+# @router.post("/create-test-task")
+# async def create_test_task(
+#     db: AsyncSession = Depends(get_db) 
+# ):
+#     task_repo = TaskRepository(db)
 
-    task = await task_repo.create_task(
-        title="Test Task",
-        description="Testing task creation",
-        task_type="web_scraping",
-        priority=1,
-        user_id=1
-    )
+#     task = await task_repo.create_task(
+#         title="Test Task",
+#         description="Testing task creation",
+#         task_type="web_scraping",
+#         priority=1,
+#         user_id=1
+#     )
 
-    return {
-        "id": task.id,
-        "title": task.title,
-        "user_id": task.user_id
-    }
+#     return {
+#         "id": task.id,
+#         "title": task.title,
+#         "user_id": task.user_id
+#     }
