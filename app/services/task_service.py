@@ -46,9 +46,15 @@ class TaskService:
             await self.db.refresh(task_obj)
             
             #invalidate cache
-            keys = await redis_client.keys(f"task_history:{user_id}:*")
-            if keys:
-                await redis_client.delete(*keys)
+            keys_to_delete = []
+            async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
+                keys_to_delete.append(key)
+                
+            if keys_to_delete:
+                await redis_client.delete(*keys_to_delete)
+            # keys = await redis_client.keys(f"task_history:{user_id}:*")
+            # if keys:
+            #     await redis_client.delete(*keys)
             return task_obj
         
         else:
@@ -68,10 +74,17 @@ class TaskService:
             await self.db.refresh(task_obj)
             
             #invalidate cache
+            keys_to_delete = []
+            async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
+                keys_to_delete.append(key)
+                
+            if keys_to_delete:
+                await redis_client.delete(*keys_to_delete)
+                
             
-            keys = await redis_client.keys(f"task_history:{user_id}:*")
-            if keys: 
-                await redis_client.delete(*keys)            
+            # keys = await redis_client.keys(f"task_history:{user_id}:*")
+            # if keys: 
+            #     await redis_client.delete(*keys)            
             
             background_tasks.add_task(simulate_heavy_processing, task_obj.id)
             return {
@@ -160,9 +173,12 @@ class TaskService:
         await self.db.commit()
         await self.db.refresh(task)  #commit writes and refresh reads back
         
-        keys = await redis_client.keys(f"task_history:{user_id}:*")
-        if keys:
-            await redis_client.delete(*keys)
+        keys_to_delete = []
+        async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
+            keys_to_delete.append(key)
+            
+        if keys_to_delete:
+            await redis_client.delete(*keys_to_delete)
             
         return task
         
