@@ -14,6 +14,12 @@ from app.core.redis import redis_client
 from app.core.database import AsyncSessionLocal
 
 from app.schemas.task import TaskCreate, TaskUpdate
+from app.core.logging import trace_id_var
+
+
+import logging 
+
+logger = logging.getLogger(__name__)
 
 class TaskService:
     def __init__(self, db:AsyncSession):
@@ -45,6 +51,16 @@ class TaskService:
             await self.db.commit()
             await self.db.refresh(task_obj)
             
+            logger.info(
+            "Light task created",
+            extra={
+                "context": {
+                    "task_id": task_obj.id,
+                    "user_id": user_id,
+                }
+            }
+        )
+            
             #invalidate cache
             keys_to_delete = []
             async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
@@ -52,6 +68,16 @@ class TaskService:
                 
             if keys_to_delete:
                 await redis_client.delete(*keys_to_delete)
+                
+            logger.info(
+                "Task history cache invalidated",
+                extra={
+                    "context": {
+                        "user_id": user_id,
+                        "deleted_keys": len(keys_to_delete),
+                    }
+                }
+            )
             # keys = await redis_client.keys(f"task_history:{user_id}:*")
             # if keys:
             #     await redis_client.delete(*keys)
@@ -73,6 +99,17 @@ class TaskService:
             await self.db.commit()
             await self.db.refresh(task_obj)
             
+            logger.info(
+                "Heavy task queued",
+                extra={
+                    "context": {
+                        "task_id": task_obj.id,
+                        "tracking_token": str(token),
+                        "user_id": user_id,
+                    }
+                }
+            )
+            
             #invalidate cache
             keys_to_delete = []
             async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
@@ -80,6 +117,16 @@ class TaskService:
                 
             if keys_to_delete:
                 await redis_client.delete(*keys_to_delete)
+                
+            logger.info(
+                "Task history cache invalidated",
+                extra={
+                    "context": {
+                        "user_id": user_id,
+                        "deleted_keys": len(keys_to_delete),
+                    }
+                }
+            )
                 
             
             # keys = await redis_client.keys(f"task_history:{user_id}:*")
@@ -117,10 +164,29 @@ class TaskService:
         cached_data = await redis_client.get(cache_key)
 
         if cached_data:
-            print("Cache Hit")
+            print(trace_id_var.get())
+            # print("Cache Hit")
+            logger.info("Cache Hit",
+                    extra={
+                        "context": {
+                            "user_id": user_id,
+                            "cache_key": cache_key,
+                        }
+                    })
+            
             return json.loads(cached_data)
+        
+        print(trace_id_var.get())
 
-        print("Cache Miss")
+        # print("Cache Miss")
+        logger.info("Cache miss",
+                    extra={
+                        "context": {
+                            "user_id": user_id,
+                            "cache_key": cache_key,
+                        }
+                    })
+        
         
         tasks, total_count = await self.task_repo.get_paginated_tasks_for_user(
             user_id=user_id, 
@@ -173,6 +239,17 @@ class TaskService:
         await self.db.commit()
         await self.db.refresh(task)  #commit writes and refresh reads back
         
+        logger.info(
+            "Task updated",
+            extra={
+                "context": {
+                    "task_id": task.id,
+                    "user_id": user_id,
+                    "updated_fields": list(update_data.keys())
+                }
+            }
+        )
+        
         keys_to_delete = []
         async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
             keys_to_delete.append(key)
@@ -180,15 +257,41 @@ class TaskService:
         if keys_to_delete:
             await redis_client.delete(*keys_to_delete)
             
+        logger.info(
+                "Task history cache invalidated",
+                extra={
+                    "context": {
+                        "user_id": user_id,
+                        "deleted_keys": len(keys_to_delete),
+                    }
+                }
+            )
+            
         return task
         
             
 async def simulate_heavy_processing(task_id: int):
+    logger.info(
+        "Heavy task processing started",
+        extra={
+            "context": {
+                "task_id": task_id
+            }
+        }
+    )
     await asyncio.sleep(10)
     async with AsyncSessionLocal() as db:
         task_repo = TaskRepository(db)
         task = await task_repo.get_task_by_id(task_id)
         if not task:
+            logger.warning(
+                "Task not found during heavy processing",
+                extra={
+                    "context": {
+                        "task_id": task_id
+                    }
+                }
+            )
             return 
         task.status = TaskStatus.COMPLETED
         await db.commit()

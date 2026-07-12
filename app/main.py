@@ -9,7 +9,22 @@ from .api.v1.users import router as user_router
 from .core.database import engine
 from .models.base import Base
 from .models import * 
+from app.core.logging import listener, setup_logging
+from app.middlewares.logging_middleware import LoggingMiddleware
+import logging 
 
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    setup_logging()
+    logger.info("Starting application and initializing database...")
+
+    try:
+        yield
+    finally:
+        listener.stop()
+        logger.info("Application shutting down")
 
 
 
@@ -25,8 +40,10 @@ app = FastAPI(
     title="TaskVortex API",
     description="Production-grade asynchronous task orchestration engine.",
     version="1.0.0",
-    # lifespan=lifespan
+    lifespan=lifespan
 )
+
+app.add_middleware(LoggingMiddleware)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

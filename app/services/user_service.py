@@ -9,6 +9,10 @@ from app.core.exception import InvalidCredentialsError, UserAlreadyExistsError
 import asyncio 
 
 
+import logging 
+
+logger = logging.getLogger(__name__)
+
 class UserService:
     def __init__(self, db:AsyncSession):
         self.db = db
@@ -24,6 +28,14 @@ class UserService:
         existing_user = await self.user_repo.get_user_by_email(user_email)
         
         if existing_user:
+            logger.warning(
+                "Attempt to create user with existing email",
+                extra={
+                    "context": {
+                        "email": user_email
+                    }
+                }
+            )
             raise UserAlreadyExistsError()
         
         hashed_password = hash_password(password=user_password)
@@ -32,21 +44,58 @@ class UserService:
         await self.db.commit()
         await self.db.refresh(user_obj)
         
+        logger.info(
+            "User registered",
+            extra={
+                "context": {
+                    "user_id": user_obj.id,
+                    "email": user_obj.email
+                }
+            }
+        )
+        
         return user_obj
         
     async def login(self, user_email: str, user_password: str):
         user = await self.user_repo.get_user_by_email(user_email)
         
         if not user:
+            if not password_matches:
+                logger.warning(
+                    "Invalid login attempt",
+                    extra={
+                        "context": {
+                            "email": user_email
+                        }
+                    }
+                )
             raise InvalidCredentialsError()
         
         password_matches = verify_password(user_password, user.hashed_password)
         
         if not password_matches:
+            logger.warning(
+                "Invalid login attempt",
+                extra={
+                    "context": {
+                        "email": user_email
+                    }
+                }
+            )
             raise InvalidCredentialsError()
         
         access_token = create_access_token(
             data={"sub": str(user.id)}
+        )
+        
+        logger.info(
+            "User logged in",
+            extra={
+                "context": {
+                    "user_id": user.id,
+                    "email": user.email
+                }
+            }
         )
         
         return access_token
