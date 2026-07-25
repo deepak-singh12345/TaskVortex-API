@@ -3,11 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+from app.core.rabbitmq import close_rabbitmq, connect_rabbitmq
+from app.services.message_publisher import publish_message
 from .api.health import router as health_router
 from .api.v1.tasks import router as tasks_router
 from .api.v1.users import router as user_router
-from .core.database import engine
-from .models.base import Base
 from .models import * 
 from app.core.logging import listener, setup_logging
 from app.middlewares.logging_middleware import LoggingMiddleware
@@ -19,12 +20,23 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("Starting application and initializing database...")
+    
+    await connect_rabbitmq()
+    
+    # await publish_message(
+    # {
+    #     "hello": "world"
+    # }
+# )
+    # await publish_message({"message": "Application started", "type":"startup_test"})
 
     try:
         yield
     finally:
+        await close_rabbitmq()
         listener.stop()
         logger.info("Application shutting down")
+        
 
 
 

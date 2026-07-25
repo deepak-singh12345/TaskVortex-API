@@ -21,6 +21,7 @@ class TaskStatus(str, Enum):
     QUEUED = "queued"
     COMPLETED = "completed"
     FAILED = "failed"
+    PROCESSING = "processing"
 
 print("Enum values from model:", [e.value for e in TaskStatus])
  
@@ -35,7 +36,7 @@ class Task(Base):
     payload: Mapped[Dict[str, Any]] = mapped_column(JSONB, default=dict)
     status: Mapped[TaskStatus] = mapped_column(SQLEnum(TaskStatus, values_callable=lambda enum_cls: [e.value for e in enum_cls]), default=TaskStatus.QUEUED)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    tracking_token: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    tracking_token: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, unique=True)
     
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     user:Mapped["User"] = relationship(back_populates="tasks")

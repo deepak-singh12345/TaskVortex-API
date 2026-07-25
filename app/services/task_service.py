@@ -16,6 +16,8 @@ from app.core.database import AsyncSessionLocal
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.core.logging import trace_id_var
 
+from app.services.message_publisher import publish_message
+
 
 import logging 
 
@@ -85,55 +87,70 @@ class TaskService:
         
         else:
             token = uuid4()
-            task_obj = Task(
-                title = task.title,
-                description = task.description,
-                priority = task.priority,
-                payload = task.payload,
-                status = TaskStatus.QUEUED,
-                tracking_token = token,
-                user_id = user_id,
-            )
-            await self.task_repo.save(task_obj)
+            # task_obj = Task(
+            #     title = task.title,
+            #     description = task.description,
+            #     priority = task.priority,
+            #     payload = task.payload,
+            #     status = TaskStatus.QUEUED,
+            #     tracking_token = token,
+            #     user_id = user_id,
+            # )
+            # await self.task_repo.save(task_obj)
             
-            await self.db.commit()
-            await self.db.refresh(task_obj)
+            # await self.db.commit()
+            # await self.db.refresh(task_obj)
             
-            logger.info(
-                "Heavy task queued",
-                extra={
-                    "context": {
-                        "task_id": task_obj.id,
-                        "tracking_token": str(token),
-                        "user_id": user_id,
-                    }
+            # logger.info(
+            #     "Heavy task queued",
+            #     extra={
+            #         "context": {
+            #             "task_id": task_obj.id,
+            #             "tracking_token": str(token),
+            #             "user_id": user_id,
+            #         }
+            #     }
+            # )
+            
+            # #invalidate cache
+            # keys_to_delete = []
+            # async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
+            #     keys_to_delete.append(key)
+                
+            # if keys_to_delete:
+            #     await redis_client.delete(*keys_to_delete)
+                
+            # logger.info(
+            #     "Task history cache invalidated",
+            #     extra={
+            #         "context": {
+            #             "user_id": user_id,
+            #             "deleted_keys": len(keys_to_delete),
+            #         }
+            #     }
+            # )
+                
+            
+            # # keys = await redis_client.keys(f"task_history:{user_id}:*")
+            # # if keys: 
+            # #     await redis_client.delete(*keys)            
+            
+            # background_tasks.add_task(simulate_heavy_processing, task_obj.id)
+            
+            token = str(uuid4())
+            
+            await publish_message(
+                {
+                    "title": task.title,
+                    "description": task.description,
+                    "priority": task.priority,
+                    "payload": task.payload,
+                    "user_id": user_id,
+                    "tracking_token": token,
                 }
             )
             
-            #invalidate cache
-            keys_to_delete = []
-            async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
-                keys_to_delete.append(key)
-                
-            if keys_to_delete:
-                await redis_client.delete(*keys_to_delete)
-                
-            logger.info(
-                "Task history cache invalidated",
-                extra={
-                    "context": {
-                        "user_id": user_id,
-                        "deleted_keys": len(keys_to_delete),
-                    }
-                }
-            )
-                
             
-            # keys = await redis_client.keys(f"task_history:{user_id}:*")
-            # if keys: 
-            #     await redis_client.delete(*keys)            
-            
-            background_tasks.add_task(simulate_heavy_processing, task_obj.id)
             return {
                 "message": "Task accepted for processing",
                 "tracking_token": str(token)

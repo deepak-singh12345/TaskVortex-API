@@ -3,6 +3,8 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from uuid import UUID
+
 from app.models.task import Task, TaskStatus
 
 class TaskRepository:
@@ -53,6 +55,12 @@ class TaskRepository:
     
     async def get_task_for_update(self, task_id: int, user_id: int) -> Task | None:
         stmt = select(Task).where(Task.user_id==user_id, Task.id == task_id).with_for_update()
+        result = await self.db.execute(stmt)
+        task = result.scalar_one_or_none()
+        return task
+    
+    async def get_task_by_tracking_token(self, tracking_token: UUID) -> Task | None:
+        stmt = select(Task).where(Task.tracking_token == tracking_token)
         result = await self.db.execute(stmt)
         task = result.scalar_one_or_none()
         return task
