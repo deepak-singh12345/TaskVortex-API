@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
+    RATE_LIMIT_CAPACITY: int
+    RATE_LIMIT_REFILL_RATE: int
+    RATE_LIMIT_TTL: int
 
     model_config = SettingsConfigDict(
         env_file=".env",

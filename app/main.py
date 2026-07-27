@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.core.rabbitmq import close_rabbitmq, connect_rabbitmq
+from app.middlewares.rate_limiter import RateLimiterMiddleware
 from app.services.message_publisher import publish_message
 from .api.health import router as health_router
 from .api.v1.tasks import router as tasks_router
@@ -55,6 +56,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(RateLimiterMiddleware)
 app.add_middleware(LoggingMiddleware)
 
 @app.exception_handler(RequestValidationError)
