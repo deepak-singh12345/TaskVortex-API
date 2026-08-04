@@ -60,19 +60,10 @@ class UserService:
         user = await self.user_repo.get_user_by_email(user_email)
         
         if not user:
-            if not password_matches:
-                logger.warning(
-                    "Invalid login attempt",
-                    extra={
-                        "context": {
-                            "email": user_email
-                        }
-                    }
-                )
+            logger.warning("Invalid login attempt", extra={"context": {"email": user_email}})
             raise InvalidCredentialsError()
         
         password_matches = verify_password(user_password, user.hashed_password)
-        
         if not password_matches:
             logger.warning(
                 "Invalid login attempt",
@@ -83,6 +74,7 @@ class UserService:
                 }
             )
             raise InvalidCredentialsError()
+        
         
         access_token = create_access_token(
             data={"sub": str(user.id)}

@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from app.core.auth import get_current_user
 from app.models.task import TaskStatus
@@ -60,7 +61,7 @@ async def get_task_history(
 @router.patch("/{task_id}")
 async def update_task(
     task: TaskUpdate,
-    task_id: int,
+    task_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

@@ -3,10 +3,11 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.identifier import generate_uuid
 from app.models.task import Task, TaskStatus
 from app.repository.task_repository import TaskRepository
 from fastapi import BackgroundTasks, HTTPException
-from uuid import uuid4
+from uuid import UUID, uuid4
 import asyncio
 import json
 from app.core.redis import redis_client
@@ -31,22 +32,19 @@ class TaskService:
     async def create_task(
         self, 
         task:TaskCreate, 
-        user_id: int, 
+        user_id: UUID, 
         background_tasks: BackgroundTasks
         ) -> Task | dict:        
         
         if task.complexity == "light":
-            print("TaskStatus.COMPLETED =", TaskStatus.COMPLETED)
-            print("TaskStatus.COMPLETED.value =", TaskStatus.COMPLETED.value)
-            print("type =", type(TaskStatus.COMPLETED))
             
             task_obj = Task(
                 title = task.title,
                 description = task.description,
                 priority = task.priority,
+                task_type = task.task_type,
                 payload = task.payload,
                 status = TaskStatus.COMPLETED,
-                tracking_token = None,
                 user_id = user_id,
             )
             await self.task_repo.save(task_obj)
@@ -86,79 +84,57 @@ class TaskService:
             return task_obj
         
         else:
-            token = uuid4()
-            # task_obj = Task(
-            #     title = task.title,
-            #     description = task.description,
-            #     priority = task.priority,
-            #     payload = task.payload,
-            #     status = TaskStatus.QUEUED,
-            #     tracking_token = token,
-            #     user_id = user_id,
-            # )
-            # await self.task_repo.save(task_obj)
+            # token = uuid4()
+            task_obj = Task(
+                id=generate_uuid(),
+                title = task.title,
+                description = task.description,
+                task_type = task.task_type,
+                priority = task.priority,
+                payload = task.payload,
+                status = TaskStatus.QUEUED,
+                user_id = user_id,
+            )
+            await self.task_repo.save(task_obj)
             
-            # await self.db.commit()
-            # await self.db.refresh(task_obj)
+            await self.db.commit()
+            await self.db.refresh(task_obj)
             
-            # logger.info(
-            #     "Heavy task queued",
-            #     extra={
-            #         "context": {
-            #             "task_id": task_obj.id,
-            #             "tracking_token": str(token),
-            #             "user_id": user_id,
-            #         }
-            #     }
-            # )
-            
-            # #invalidate cache
-            # keys_to_delete = []
-            # async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
-            #     keys_to_delete.append(key)
-                
-            # if keys_to_delete:
-            #     await redis_client.delete(*keys_to_delete)
-                
-            # logger.info(
-            #     "Task history cache invalidated",
-            #     extra={
-            #         "context": {
-            #             "user_id": user_id,
-            #             "deleted_keys": len(keys_to_delete),
-            #         }
-            #     }
-            # )
-                
-            
-            # # keys = await redis_client.keys(f"task_history:{user_id}:*")
-            # # if keys: 
-            # #     await redis_client.delete(*keys)            
-            
-            # background_tasks.add_task(simulate_heavy_processing, task_obj.id)
-            
-            token = str(uuid4())
-            
-            await publish_message(
-                {
-                    "title": task.title,
-                    "description": task.description,
-                    "priority": task.priority,
-                    "payload": task.payload,
-                    "user_id": user_id,
-                    "tracking_token": token,
+            logger.info(
+                "Heavy task queued",
+                extra={
+                    "context": {
+                        "task_id": task_obj.id,
+                        "user_id": user_id,
+                    }
                 }
             )
             
-            
+            # #invalidate cache
+            keys_to_delete = []
+            async for key in redis_client.scan_iter(match=f"task_history:{user_id}:*"):
+                keys_to_delete.append(key)
+                
+            if keys_to_delete:
+                await redis_client.delete(*keys_to_delete)
+                
+            await publish_message(
+                            {
+                                "task_id": str(task_obj.id),
+                                "user_id": str(user_id),
+                            }
+                        )
+                
             return {
+                "task_id": task_obj.id,
+                "status": task_obj.status,
                 "message": "Task accepted for processing",
-                "tracking_token": str(token)
             }
+    
             
     async def get_task_history(
         self, 
-        user_id: int,
+        user_id: UUID,
         status: TaskStatus | None,
         search_query: str | None,
         start_date: datetime | None,
@@ -223,7 +199,6 @@ class TaskService:
                 "status": task.status.value,
                 "priority": task.priority,
                 "payload": task.payload,
-                "tracking_token": str(task.tracking_token) if task.tracking_token else None,
                 "created_at": task.created_at.isoformat(),
             })
         response =  {
@@ -239,7 +214,7 @@ class TaskService:
         await redis_client.set(cache_key, json.dumps(response), ex=300)
         return response 
     
-    async def update_task(self, task_id: int, user_id: int, task_update: TaskUpdate):
+    async def update_task(self, task_id: UUID, user_id: UUID, task_update: TaskUpdate):
         task = await self.task_repo.get_task_for_update(task_id, user_id)
         
         if task is None:
@@ -285,32 +260,3 @@ class TaskService:
             )
             
         return task
-        
-            
-async def simulate_heavy_processing(task_id: int):
-    logger.info(
-        "Heavy task processing started",
-        extra={
-            "context": {
-                "task_id": task_id
-            }
-        }
-    )
-    await asyncio.sleep(10)
-    async with AsyncSessionLocal() as db:
-        task_repo = TaskRepository(db)
-        task = await task_repo.get_task_by_id(task_id)
-        if not task:
-            logger.warning(
-                "Task not found during heavy processing",
-                extra={
-                    "context": {
-                        "task_id": task_id
-                    }
-                }
-            )
-            return 
-        task.status = TaskStatus.COMPLETED
-        await db.commit()
-        
-        

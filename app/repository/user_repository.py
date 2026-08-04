@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -14,7 +16,7 @@ class UserRepository:
         
         return None  #here we returned the user object with the values stored in the db
     
-    async def get_user_by_id(self, user_id: int) -> User | None:
+    async def get_user_by_id(self, user_id: UUID) -> User | None:
         stmt = select(User).where(User.id == user_id)  #Blueprint of the sql query
         
         result = await self.db.execute(stmt)  #query is executed and a sqlalchemy result wrapper

@@ -11,59 +11,34 @@ class TaskRepository:
     def __init__(self, db: AsyncSession):
         self.db: AsyncSession = db
         
-    # async def create_task(
-    #     self,
-    #     title: str,
-    #     description: str | None,
-    #     # task_type: str,
-    #     priority: int,
-    #     user_id: int,
-    #     payload: dict,
-    #     status: str,
-    #     tracking_token: str
-    # ) -> Task:
-    #     task = Task(
-    #         title=title,
-    #         description=description,
-    #         # task_type=task_type,
-    #         priority=priority,
-    #         user_id=user_id
-    #     )
-
-    #     self.db.add(task)
-    #     await self.db.commit()
-    #     await self.db.refresh(task)
-
-    #     return task
     
     async def save(self, task: Task) -> None:
         self.db.add(task)
         
         return None
         
-    async def get_task_by_id(self, task_id: int) -> Task | None:
+    async def get_task_by_id(self, task_id: UUID) -> Task | None:
         stmt = select(Task).where(Task.id == task_id) 
         result = await self.db.execute(stmt)
         task = result.scalar_one_or_none()
         return task 
     
-    async def get_tasks_by_user(self, user_id: int) -> list[Task]:
+    async def get_tasks_by_user(self, user_id: UUID) -> list[Task]:
         stmt = select(Task).where(Task.user_id == user_id)
         result = await self.db.execute(stmt)
         tasks = result.scalars().all()
         return tasks 
     
-    async def get_task_for_update(self, task_id: int, user_id: int) -> Task | None:
+    async def get_task_for_update(self, task_id: UUID, user_id: UUID) -> Task | None:
         stmt = select(Task).where(Task.user_id==user_id, Task.id == task_id).with_for_update()
         result = await self.db.execute(stmt)
         task = result.scalar_one_or_none()
         return task
     
-    async def get_task_by_tracking_token(self, tracking_token: UUID) -> Task | None:
-        stmt = select(Task).where(Task.tracking_token == tracking_token)
+    async def get_task_for_processing(self, task_id: UUID) -> Task | None:
+        stmt = select(Task).where(Task.id == task_id).with_for_update()
         result = await self.db.execute(stmt)
-        task = result.scalar_one_or_none()
-        return task
+        return result.scalar_one_or_none()
     
     async def get_paginated_tasks_for_user(
         self, 

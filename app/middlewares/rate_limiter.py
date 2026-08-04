@@ -13,7 +13,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.repo = RateLimitingRepository()
         
     async def dispatch(self, request, call_next):
-        if request.url.path == "/health":
+        if request.url.path == "/api/v1/health":
             return await call_next(request)
         
         ip = request.client.host
