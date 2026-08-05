@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time 
 
 import aio_pika
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -8,6 +9,8 @@ from sqlalchemy.exc import OperationalError
 
 from app.core.database import AsyncSessionLocal
 from app.models.task import TaskStatus
+from app.repository.metrics_cache_repository import MetricsCacheRepository
+from app.repository.metrics_repository import MetricsRepository
 from app.repository.task_repository import TaskRepository
 from app.core.redis import redis_client
 
@@ -30,10 +33,10 @@ async def _fetch_task_with_retry(repo: TaskRepository, task_id):
 async def process_message(message: aio_pika.IncomingMessage):
     async with message.process():
         try:
-                
             body = json.loads(message.body.decode())
             task_id = body["task_id"]
         except (json.JSONDecodeError, KeyError):
+            logger.exception("Malformed message, dropping")
             return 
         
         logger.info(
@@ -48,6 +51,8 @@ async def process_message(message: aio_pika.IncomingMessage):
 
         async with AsyncSessionLocal() as db:
             repo = TaskRepository(db)
+            metrics_repo = MetricsRepository(db)
+            metrics_cache = MetricsCacheRepository()
 
             try:
                 task = await _fetch_task_with_retry(repo, task_id)
@@ -71,23 +76,49 @@ async def process_message(message: aio_pika.IncomingMessage):
             task.status = TaskStatus.PROCESSING
             await db.commit()
             
+            start = time.monotonic()
             try: 
                 await asyncio.wait_for(process_heavy_task(), timeout=10.0)
+                execution_time_ms = int((time.monotonic() - start) * 1000)
+                
                 task.status = TaskStatus.COMPLETED
                 await db.commit()
+                
+                await metrics_cache.incr_completed(execution_time_ms)
+                await metrics_repo.create_log(
+                    task_id=task.id, status="completed", execution_time_ms=execution_time_ms, message=None,
+                )
+                
                 logger.info("Task completed", extra={"context": {"task_id": task_id}})
             
             except asyncio.TimeoutError:
+                execution_time_ms = int((time.monotonic() - start) * 1000)
                 task.status = TaskStatus.FAILED
                 await db.commit()
+                
+                await metrics_cache.incr_failed()
+                await metrics_repo.create_log(
+                    task_id=task.id, status="failed", execution_time_ms=execution_time_ms, message="Processing timed out"
+                )
+                
                 logger.warning("Task processing timed out", extra={"context": {"task_id": task_id}})
                 
-            except Exception:
+            except OperationalError:
+                logger.exception("DB unreachable finalizing task status", extra={"context": {"task_id": task_id}})
+                raise 
+            
+            except Exception as e:
                 # Catch-all: anything unexpected in the processing step
                 # becomes a recorded FAILED row, not a vanished message.
+                execution_time_ms = int((time.monotonic()-start) *1000)
                 await db.rollback()
                 task.status = TaskStatus.FAILED
                 await db.commit()
+                
+                await metrics_cache.incr_failed()
+                await metrics_repo.create_log(
+                    task_id=task.id, status="failed", execution_time_ms=execution_time_ms, message=str(e)
+                )
                 logger.exception("Unexpected error during processing", extra={"context": {"task_id": task_id}})
                 
             keys_to_delete = []

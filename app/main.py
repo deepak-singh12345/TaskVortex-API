@@ -10,6 +10,7 @@ from app.services.message_publisher import publish_message
 from .api.health import router as health_router
 from .api.v1.tasks import router as tasks_router
 from .api.v1.users import router as user_router
+from .api.v1.metrics import router as metrics_router
 from .models import * 
 from app.core.logging import listener, setup_logging
 from app.middlewares.logging_middleware import LoggingMiddleware
@@ -85,3 +86,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 app.include_router(health_router, prefix='/api')
 app.include_router(tasks_router, prefix='/api')
 app.include_router(user_router, prefix="/api")
+app.include_router(metrics_router, prefix="/api")

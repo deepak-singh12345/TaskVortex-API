@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.identifier import generate_uuid
 from app.models.task import Task, TaskStatus
+from app.repository.metrics_cache_repository import MetricsCacheRepository
 from app.repository.task_repository import TaskRepository
 from fastapi import BackgroundTasks, HTTPException
 from uuid import UUID, uuid4
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 class TaskService:
     def __init__(self, db:AsyncSession):
         self.db = db
-        self.task_repo = TaskRepository(db) 
+        self.task_repo = TaskRepository(db)
+        self.metrics_cache_repo = MetricsCacheRepository() 
         
     async def create_task(
         self, 
@@ -99,6 +101,8 @@ class TaskService:
             
             await self.db.commit()
             await self.db.refresh(task_obj)
+            
+            await self.metrics_cache_repo.incr_ingested()
             
             logger.info(
                 "Heavy task queued",
